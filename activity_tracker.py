@@ -2,6 +2,7 @@ import praw
 from datetime import datetime
 from secrets import *
 import pandas as pd
+from pathlib import Path
 
 reddit = praw.Reddit(
     client_id=client_id,
@@ -67,13 +68,34 @@ def activity_to_df(comments, posts):
     )
     return activitydf
 
+def save_to_pickle(activitydf: pd.DataFrame, karmadf: pd.DataFrame):
+    """Save given pandas dataframe args to a pickle file in data directory."""
+    activitydf.to_pickle(Path.cwd() / "data" / "activity_data.pkl")
+    karmadf.to_pickle(Path.cwd() / "data" / "karmatracker.pkl")
 
-accounts = ["mohiemen", "KingPZe"]
+def save_to_csv(activitydf: pd.DataFrame, karmadf: pd.DataFrame):
+    """Save given pandas dataframe args to a csv file in data directory."""
+    activitydf.to_csv(Path.cwd() / "data" / "activity_data.csv")
+    karmadf.to_csv(Path.cwd() / "data" / "karmatracker.csv")
 
-for account in accounts:
-    user = retrieve_account(account)
-    try:
-        df = df.append(retrieve_activity(user["object"].name), ignore_index=True)
-    except NameError:
-        df = retrieve_activity(user["object"].name)
-    print(df)
+if __name__ == "__main__":
+    accounts = ["mohiemen", "KingPZe"]
+    user_info = []
+    for account in accounts:
+        user = retrieve_account(account)
+        user_info.append(user["account_info"])
+        try:
+            activitydf = activitydf.append(
+                retrieve_activity(user["object"].name), ignore_index=True
+            )
+        except NameError:
+            activitydf = retrieve_activity(user["object"].name)
+    karmadf = pd.DataFrame(
+        user_info, columns=["account_name", "post_karma", "comment_karma", "timestamp"]
+    )
+    print(activitydf)
+    print(karmadf)
+
+    # Only uncomment these commands when you are first saving or you want to overwrite old files.
+    save_to_pickle(activitydf,karmadf)
+    save_to_csv(activitydf,karmadf)
