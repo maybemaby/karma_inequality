@@ -1,9 +1,9 @@
 # Module to select random redditors with certain karma values.
 
-import praw
+import praw, prawcore.exceptions
 from secrets import *
 import numpy as np
-import random
+import random, time
 import pandas as pd
 from pathlib import Path
 
@@ -36,17 +36,22 @@ def random_redditor(count: int, min_karma: int, max_karma: int) -> pd.DataFrame:
     )
     count_gen = (i for i in range(count))
     while True:
+        print(redditor_df)
         rand_subreddit = reddit.subreddit("random")
         hot_posts = (x for x in rand_subreddit.hot(limit=10) if not x.stickied)
-        rand_indices = (
-            random.randint(0, 9),
-            random.randint(0, 9),
-            random.randint(0, 9),
-        )
         for index, post in enumerate(hot_posts):
+            author = post.author
             # Check if the user is suspended.
-            if index in rand_indices and (not "is_suspended" in vars(post.author)):
-                karma = int(post.author.link_karma) + int(post.author.comment_karma)
+            if author:
+                try:
+                    karma = int(post.author.link_karma) + int(post.author.comment_karma)
+                except prawcore.exceptions.NotFound:  # Account deleted
+                    continue
+                except AttributeError:  # Account suspended
+                    continue
+                except prawcore.exceptions.ServerError:  # Reddit server overloaded
+                    time.sleep(10)
+                    continue
                 if (
                     (karma >= min_karma)
                     and (karma <= max_karma)
@@ -65,7 +70,7 @@ def random_redditor(count: int, min_karma: int, max_karma: int) -> pd.DataFrame:
 
 
 if __name__ == "__main__":
-    min_karma = 100
-    max_karma = 50000
-    datapoints = random_redditor(10, 100, 50000)
+    min_karma = 50000
+    max_karma = 100000
+    datapoints = random_redditor(1000, min_karma, max_karma)
     datapoints.to_csv(Path.cwd() / "data" / f"redditors_{min_karma}-{max_karma}.csv")
