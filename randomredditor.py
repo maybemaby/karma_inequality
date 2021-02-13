@@ -69,8 +69,60 @@ def random_redditor(count: int, min_karma: int, max_karma: int) -> pd.DataFrame:
                         return redditor_df
 
 
+def continue_df(
+    filename: str, extcount: int, min_karma: int, max_karma: int
+) -> pd.DataFrame:
+    """Function to continue partially completed dfs.
+
+    Inputs
+    ------
+    filename: Name of csv in data directory.
+    extcount: Number of extra redditors you want retrieved to the old data.
+    min_karma: Minimum karma they should have.
+    max_karma: Maximum karma they should have.
+
+    Returns
+    ------
+    pandas.Dataframe with columns: username, karma, karma range and shape: (len(df)+extcount,3)
+    """
+
+    redditor_df = pd.read_csv(Path.cwd() / "data" / filename, index_col=0)
+    ogsize = len(redditor_df)
+    while True:
+        print(redditor_df)
+        rand_subreddit = reddit.subreddit("random")
+        hot_posts = (x for x in rand_subreddit.hot(limit=10) if not x.stickied)
+        for index, post in enumerate(hot_posts):
+            author = post.author
+            # Check if the user is suspended.
+            if author:
+                try:
+                    karma = int(post.author.link_karma) + int(post.author.comment_karma)
+                except prawcore.exceptions.NotFound:  # Account deleted
+                    continue
+                except AttributeError:  # Account suspended
+                    continue
+                except prawcore.exceptions.ServerError:  # Reddit server overloaded
+                    time.sleep(10)
+                    continue
+                if (
+                    (karma >= min_karma)
+                    and (karma <= max_karma)
+                    # Check if we already have the user.
+                    and (post.author.name not in redditor_df["username"].values)
+                ):
+                    redditor_df.loc[len(redditor_df)] = [
+                        post.author.name,
+                        karma,
+                        f"{min_karma}-{max_karma}",
+                    ]
+                if len(redditor_df) == ogsize + extcount:
+                    return redditor_df
+
+
 if __name__ == "__main__":
-    min_karma = 50000
-    max_karma = 100000
-    datapoints = random_redditor(1000, min_karma, max_karma)
+    min_karma = 100000
+    max_karma = 1000000
+    # datapoints = random_redditor(100, min_karma, max_karma)
+    datapoints = continue_df("redditors_100000-1000000.csv", 100, min_karma, max_karma)
     datapoints.to_csv(Path.cwd() / "data" / f"redditors_{min_karma}-{max_karma}.csv")
