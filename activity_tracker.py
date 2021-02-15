@@ -1,8 +1,10 @@
-import praw
+import praw, itertools
 from datetime import datetime
 from secrets import *
 import pandas as pd
 from pathlib import Path
+
+# TODO: Update karmatracker.csv not working properly. Doesn't have new day's karma info.
 
 reddit = praw.Reddit(
     client_id=client_id,
@@ -19,7 +21,7 @@ def retrieve_account(name: str) -> dict:
     account_name = account.name
     post_karma = account.link_karma
     comment_karma = account.comment_karma
-    current_date = datetime.now()
+    current_date = datetime.utcnow()
     return {
         "object": account,
         "account_info": (account_name, post_karma, comment_karma, current_date),
@@ -122,11 +124,34 @@ def update_csv(activitydf: pd.DataFrame, karmadf: pd.DataFrame):
 
 
 if __name__ == "__main__":
-    # accounts = ["mohiemen", "KingPZe"]
-    accounts = ["orchid_breeder", "DurovCode"]
+    redditors_1 = pd.read_csv(
+        Path.cwd() / "data" / "redditors_100-1000.csv", index_col=0
+    )
+    redditors_2 = pd.read_csv(
+        Path.cwd() / "data" / "redditors_1000-10000.csv", index_col=0
+    )
+    redditors_3 = pd.read_csv(
+        Path.cwd() / "data" / "redditors_10000-50000.csv", index_col=0
+    )
+    redditors_4 = pd.read_csv(
+        Path.cwd() / "data" / "redditors_50000-100000.csv", index_col=0
+    )
+    redditors_5 = pd.read_csv(
+        Path.cwd() / "data" / "redditors_100000-1000000.csv", index_col=0
+    )
+    redditors_all = [redditors_1, redditors_2, redditors_3, redditors_4, redditors_5]
+    accounts = itertools.chain.from_iterable(
+        (df.username.tolist() for df in redditors_all)
+    )
     user_info = []
+    deleted_user = []
     for account in accounts:
-        user = retrieve_account(account)
+        try:
+            user = retrieve_account(account)
+        # Account deleted
+        except:
+            deleted_user.append(account)
+            continue
         user_info.append(user["account_info"])
         try:
             activitydf = activitydf.append(
@@ -145,5 +170,5 @@ if __name__ == "__main__":
     # save_to_csv(activitydf, karmadf)
 
     # Functions to update existing files.
-    # update_pickle(activitydf, karmadf)
-    # update_csv(activitydf, karmadf)
+    update_pickle(activitydf, karmadf)
+    update_csv(activitydf, karmadf)
